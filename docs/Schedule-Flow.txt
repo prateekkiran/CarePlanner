@@ -1,0 +1,229 @@
+A. Design Principles (for this new flow)
+One primary decision per stepAt any time, user sees only 1–3 fields, and only those that depend on previous inputs.
+System does the heavy liftingUse data to filter and pre-fill:
+Only show services that are actually authorized.
+Show time windows that respect clinic hours + auth + staff capacity.
+Pre-select staff and location based on usual patterns.
+Inline, context-aware validationsSystem doesn’t just block; it guides:
+“You can schedule up to 1.5 hours here; auth runs out after that.”
+“These 3 staff are both eligible and free for this slot.”
+Auto-draft & resumableAt each step, the system quietly saves a draft.
+B. High-Level Step Flow
+We’ll reframe the flow as:
+Select client → 2. Choose intent (what are we doing?) → 3. Pick service →
+Pick date & duration → 5. Select staff → 6. Pick location →
+Decide recurrence → 8. Review & confirm
+Only one decision group visible at a time.
+C. Step-by-Step Flow With Automations
+Step 1 – Select Client (and silently load brain)
+What user sees:
+Just:
+Search client field
+List of recent clients (optional)
+As soon as a client is chosen, the system silently loads:
+Active funding sources & authorizations
+Treatment plan (target weekly hours, service mix)
+Usual service locations (home vs center)
+Usual staff assigned to this client
+Automation:
+If client is inactive → immediate clear warning and disable billable paths.
+If no active auth → show simple branch:
+“This client has no active ABA authorization.[Schedule non-billable] [Cancel]”
+Only after a valid client state is confirmed do we reveal Step 2.
+Step 2 – “What are we scheduling?” (Intent + Service)
+We don’t dump all services. We ask intent first.
+UI:
+Question:
+“What type of visit are you scheduling for <ClientName>?”
+Buttons/tiles:
+Ongoing ABA therapy
+Assessment / Reassessment
+Parent training
+Supervision
+Other
+When user taps one, we show a service picker filtered by that intent:
+Services list is already pre-filtered by:
+What the client is authorized for
+What’s clinically relevant to that intent
+Automation here:
+Show only services tied to active auths at the top (and label them):
+“Recommended (covered)”
+Collapse or visually separate:
+“Other internal/non-billable services”
+When a service is selected, the system:
+Pre-sets default duration from catalog (e.g., 120 mins)
+Knows allowed staff roles (BCBA, RBT...)
+Knows allowed POS (center/home/telehealth)
+Only then do we show Next.
+Step 3 – Date & Duration (Constrained by Authorization + Clinic Hours)
+Now we decide when and how long – but we limit this using the data we already loaded.
+UI:
+Question:
+“When should this session happen?”
+User sees:
+A mini date picker (calendar) – only future dates, grey out days beyond auth end date.
+After picking a date, show a duration selector with:
+30 min, 60 min, 90 min, 120 min
+Smart default based on service (e.g., 120 min)
+Automation & guardrails:
+Authorization-aware duration limits
+System checks remaining authorized hours/units for that service.
+If remaining is less than default, duration picker is capped:
+Example: only 1 hour left for this auth
+System shows info:
+“Remaining authorized time: 1.0 hours until 15 Jan.”
+Duration options above that show as disabled:
+120 min greyed out with tooltip: “Exceeds remaining auth time.”
+Clinic-level constraints
+If the chosen date is a clinic holiday or closed day → step shows inline:
+“Clinic is closed on this date. Pick another day.”
+Only after a valid date + duration are chosen does time selection appear.
+Time selection that respects clinic hours
+Once date + duration picked:
+Show time slots only within clinic hours (e.g. 8–6)
+Slots that would push session past closing time are hidden or disabled:
+5 pm start for a 2-hr session might be disabled if clinic closes at 6.
+After a valid date + time + duration is selected, we move on.
+Step 4 – Staff Selection (Filtered & Ranked Automatically)
+Now that we know client + service + date + time + duration, the system can do magic.
+UI:
+Question:
+“Who will deliver this session?”
+User sees:
+A ranked list of staff cards:
+Assigned Staff First: those already on the client’s care team
+Then Other eligible staff
+Each card shows:
+Name, role (RBT/BCBA/etc)
+Home location (or site)
+Daily load indicator: e.g. 6.5 / 8 hours booked
+Conflict indicator for that slot: ✅ Available or ⚠ Overlap or ⚠ Tight travel window
+Automation & filter logic:
+Before any options are shown, system filters down:
+Credential filter
+Only staff whose roles/credentials are appropriate for this service + payer.
+Location / modality filter
+If we know this will likely be home/center/telehealth (from client/service hints), we prioritize staff who actually serve that modality.
+Schedule availability
+Remove staff with absolute conflicts.
+Deprioritize staff nearing daily/weekly hour thresholds.
+Travel feasibility (for home/community)
+If staff has adjacent visits:
+Exclude staff where travel buffer is insufficient.
+Mark staff “OK” or “Risky” with small icon + tooltip.
+So the scheduler mostly just picks from a short, smartly ordered list, not a long unfiltered list.
+Only when staff is chosen do we move to location.
+Step 5 – Location (Type + Details, POS + EVV Automated)
+Now we clarify where this session will happen. But we already know a lot.
+UI:
+Question:
+“Where will this session take place?”
+Show 3–4 location type buttons:
+[Center] [Home] [School] [Telehealth]
+Based on client’s usual pattern and service type, preselect one. Example:
+If this client almost always has home sessions with this service → Home preselected.
+Once type is chosen:
+If Center:
+Show only:
+Site (default to staff’s primary site)
+Room dropdown – rooms that are at capacity in this slot show as greyed or warning.
+If Home:
+Show address read-only (from client record)
+A note:
+“Travel time from previous session for Sam: 18 min. Gap: 25 min → OK.”
+Auto-flag EVV if this payer/state requires EVV for home-based ABA.
+If Telehealth:
+Show:
+Eligibility chip:
+“Covered for this payer and service”
+Or “Not covered – will be non-billable”
+A toggle:
+“Generate telehealth link automatically” (checked by default)
+If School:
+Show school name prefilled (if we know it), else a search.
+Option to add a school contact person (optional).
+Automation:
+POS code is fully automatic based on location type.
+EVV flag is automatic for home/community where required.
+If location choice is incompatible with payer rules → user sees:
+“This payer does not cover home-based sessions for this service.[Switch to center] [Continue as non-billable].”
+Once location is valid, we unlock recurrence.
+Step 6 – Recurrence (Guided by Treatment Plan + Auth)
+Now we decide if this is a one-off or recurring.
+UI:
+Toggle:
+Does this repeat? [No, just this session] [Yes, create a schedule]
+If No → jump straight to review.
+If Yes:
+We show a simple pattern builder, but pre-seeded:
+Automation:
+Treatment-plan-based suggestion
+If treatment plan for this service says “4x/week, 2 hours each” and we just created a 2-hr Monday session:
+Suggest:
+“Based on the treatment plan, you usually schedule this 4x/week.[Add Wed, Thu, Fri at same time] [Customize]”
+Authorization-aware recurrence limit
+System estimates total hours from recurrence and compares to auth:
+“This pattern for the remaining auth period will use ~36 of 40 hours → ✅ OK”
+or “This pattern exceeds auth by ~12 hours → ⚠ Limit end date to 15 Aug or reduce frequency.”
+Staff + room + clinic hours validation across series
+Show only a summary:
+“3 instances fall on holidays”
+“2 instances conflict with Sam’s existing meetings”
+Provide one click action:
+[Auto-adjust conflicts] → system suggests shifting or skipping problematic occurrences.
+[Show details] → for power users.
+The scheduler chooses:
+End condition:
+End after X sessions
+End on date
+End with auth end date (smart default)
+Still only a few controls visible at once.
+Step 7 – Review & Commit (Minimal, Focused)
+Finally, a lightweight summary that surfaces automations and key validations, not every field.
+UI:
+Card layout:
+Card 1 – Who & What
+Client: X
+Service: 97153 – ABA therapy
+Funding: Auth #123 (32/40 hours used after these sessions)
+Card 2 – When & Where
+Single: [Date, Time, Duration, Location]
+Or Recurrence:
+“Mon, Wed, Thu — 3–5 PM — from 5 Aug to 15 Oct (24 sessions)”
+Card 3 – Staff & Risk Summary
+Staff: Sam (RBT)
+Staff load: Max 7.5 hrs/day, 32 hrs/week after this schedule
+Flags:
+✅ No unauthorized services
+✅ EVV configured (home sessions)
+⚠ 2 occurrences fall on a school holiday → “We’ll skip these by default”
+Actions:
+Primary: Schedule 24 sessions
+Secondary: Save as draft schedule (if something needs Clinical Director sign-off)
+There’s no long form here. It’s a structured confirmation that acknowledges all the smart decisions the system made.
+D. Examples of Automations & Validations (Checklist)
+Here’s a quick list of automation opportunities we explicitly built in:
+Client selection
+Auto-load active auths, treatment plan, usual settings.
+Service selection
+Pre-filter services to those authorized for this client and intent.
+Label “Recommended (covered)” vs “Non-billable/Other”.
+Duration selection
+Cap editable duration by remaining authorized time.
+Hide or disable unrealistic durations given clinic hours.
+Date/time choice
+Grey out dates past auth end date.
+Hide/disable times that push past clinic hours or staff’s maximum hours.
+Staff selection
+Filter by credential, availability, location, and travel feasibility.
+Sort by “assigned to client” + least load + shortest travel.
+Location
+Default to most common setting for this client/service.
+Auto-derive POS and EVV requirements; block invalid payer-combinations.
+Recurrence
+Suggest patterns derived from treatment plan.
+Limit total projected hours by auth; show usage bar.
+Pre-handle holidays, staff PTO, room closures with “auto adjust”.
+Review
+Show compact summary of: auth usage, EVV status, conflict resolutions.
+Provide clear risk chips, not cryptic error logs.

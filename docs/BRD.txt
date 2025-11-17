@@ -1,0 +1,569 @@
+## 1. Appointment Participation Model (Core Concept Upgrade)
+
+### 1.1 Appointment Entity – Participants & Structure
+
+Every appointment is now modeled as:
+
+* **Appointment (header)**
+
+  * ID
+  * Scheduled start/end
+  * Service type / code
+  * Location, funding source, etc.
+
+* **AppointmentParticipants (child collection)**
+  Each participant row has:
+
+  * Participant type: `Client` | `Staff` | `Caregiver` | `Other`
+  * Participant ID (linked to Client/Staff/Contact record)
+  * Role on appointment:
+
+    * For Staff: `Delivering Clinician`, `Supervisor`, `Co-therapist`, `Observer`, `Trainer`, `Admin`
+    * For Clients: `Primary Client`, `Sibling`, `Group Member`, `Family Member`
+    * For Caregiver: `Parent`, `Guardian`, `Teacher`, `School Staff`
+  * Flags:
+
+    * `IsBillingRelevant` (Y/N)
+    * `IsEVVRelevant` (Y/N)
+  * **Actual timestamps (per participant)**:
+
+    * `ActualStartTime`
+    * `ActualEndTime`
+  * Signature fields:
+
+    * `SignatureStatus` (Pending / Signed / Declined)
+    * `SignatureType` (eSignature, PIN, Wet-sign captured, EVV device sign)
+    * `SignatureTimestamp`
+
+This structure supports:
+
+* Multi-staff, multi-client, multi-caregiver in same appointment.
+* Staff-only or client-only records (i.e., collection can be {Staff} only, {Client} only, or any combo).
+
+### 1.2 Allowed Appointment Participation Combos
+
+You want “all practically possible and compliant” combos in ABA. Model-wise, we support:
+
+1. **Client + Staff (standard clinical)**
+
+   * 1:1 Direct ABA
+   * Group ABA (multiple clients, one or more staff)
+   * Parent training with client present
+   * Supervision with client present
+
+2. **Clients + Multiple Staff**
+
+   * BCBA + RBT + Client
+   * Multiple RBTs + Client (overlap, transitions, safety, etc.)
+   * Group session (multiple clients, multiple staff)
+
+3. **Staff Only**
+
+   * Team meetings
+   * Case review
+   * Internal supervision (no client present)
+   * Training sessions
+   * PTO, sick leave, admin blocks, travel
+
+4. **Client + Caregiver, No Staff**
+
+   * Rare clinically (from a billing/compliance perspective) but system can support:
+
+     * Parent-only planned activities (e.g., parent practice tasks on portal, non-billable)
+     * School events blocked on client calendar
+   * Typically non-billable and not used for claims, but valid as **calendar events**.
+
+5. **Staff + Caregiver, No Client**
+
+   * School meetings
+   * IEP meetings where client not present
+   * Parent consults only
+   * Payer-dependent billability (some allow 97156 w/o child present; others don’t).
+
+6. **Client Only**
+
+   * Calendar markers (“Field Trip”, “Holiday”, “Other provider appointment”)
+   * These never flow to billing but are important for availability context.
+
+We enforce compliance with **rulesets**, not with the raw data model, i.e.:
+
+* Some combinations are allowed as billable (e.g., staff+client; parent training).
+* Others are allowed but **non-billable** (e.g., staff-only admin meeting).
+* Some are allowed as calendar events but not billable (client-only).
+
+---
+
+## 2. Appointment Lifecycle With In-View Completion & Signing
+
+We introduce a **single Appointment Detail View** that handles:
+
+* Scheduling data
+* Actual time & EVV data
+* Signatures
+* Validation status
+
+### 2.1 Appointment Status Lifecycle (Updated)
+
+Status progression:
+
+1. `Scheduled`
+2. `In Progress` (optional, when staff checks in)
+3. `Completed – Pending Signatures/Validation`
+4. `Completed – Validated` (all checks passed)
+5. Optional failure/exception states:
+
+   * `No Show`
+   * `Cancelled – Client`
+   * `Cancelled – Clinic`
+   * `Late Cancel`
+   * `Failed – EVV`
+
+The key upgrade: **completion is not just “mark done”; it’s a validation and sign-off flow.**
+
+---
+
+## 3. Unified Appointment Detail View – Flow & Validations
+
+### WF-APP-01: View & Complete Appointment With Signatures
+
+**Persona:** RBT/BCBA (field user), sometimes Scheduler/Billing for corrections
+**Goal:** After the appointment, come back to the same place, verify actual time, capture signatures, and mark as complete & validated.
+
+---
+
+### 3.1 Main Steps
+
+1. **Open Appointment Detail View**
+
+   User sees:
+
+   * Scheduled time: `ScheduledStart`, `ScheduledEnd`, `ScheduledDuration`.
+   * Participant list with roles.
+   * Service code, payer, location, authorization info.
+   * EVV status (if applicable).
+   * Validation banner (e.g., green, amber, red).
+
+2. **Check-In / Actual Start (In-Session)**
+
+   Options:
+
+   * Real-time: Staff taps **“Start Session”** → `ActualStartTime` for staff (and EVV start if enabled).
+   * Retroactive: After the fact, staff enters `ActualStartTime` manually (if allowed).
+
+3. **Check-Out / Actual End**
+
+   * Staff taps **“End Session”** → `ActualEndTime`.
+   * For multi-staff or multi-client:
+
+     * Either:
+
+       * Single master actual time for all, or
+       * Per-participant times (e.g., BCBA joins later, leaves earlier).
+
+4. **Document Session (Linked Workflow)**
+
+   * Staff completes note (SOAP, etc.).
+   * Note status updated to Complete or Draft.
+   * Appointment cannot be fully validated unless note is completed (rule is configurable).
+
+5. **Capture Signatures (Same View)**
+
+   Typically:
+
+   * **Staff Signature**
+
+     * Staff signs once per appointment, or per participant if payor requires.
+   * **Caregiver/Client Signature**
+
+     * Client or caregiver signs if required by payer or EVV.
+
+   For each signature:
+
+   * Signature widget in the same view (draw, PIN, typed).
+   * Captures:
+
+     * `SignatureBy` (linked to participant/contact)
+     * `SignatureRole` (Staff / Caregiver / Client)
+     * `SignatureType` (eSign, PIN, EVV)
+     * `SignatureTimestamp`
+   * For EVV: may reuse EVV collect signature.
+
+6. **Validation Check & Summary**
+
+   When user clicks **“Validate & Complete”**, the system:
+
+   * Compares `ActualStart/End` vs `ScheduledStart/End`.
+   * Re-runs billing & compliance rules (auth, payer, credential, EVV).
+   * Highlights discrepancies and warnings.
+
+7. **Finalize**
+
+   If all required validations pass, status moves to:
+
+   * `Completed – Validated`
+
+   If not, stays `Completed – Pending Validation` with:
+
+   * Specific error messages
+   * Required action (fix time, fix auth, add note, add signature, etc.)
+
+---
+
+### 3.2 Validation Rules for Sign-Off
+
+We’ll define these as V-APP-* rules.
+
+#### V-APP-01: Timestamps vs Scheduled Time
+
+* **Rule:** `ActualDuration = ActualEndTime - ActualStartTime` must be:
+
+  * > 0
+  * ≥ minimum duration per payer/code (e.g., 15 mins, etc.)
+* Warn or error when:
+
+  * `ActualDuration` deviates from `ScheduledDuration` beyond configured threshold (e.g., ± 15 minutes).
+* If `ActualStartTime` or `ActualEndTime` missing:
+
+  * Block full validation; keep at `Pending`.
+
+#### V-APP-02: Rounding Rules to Units
+
+* For billing:
+
+  * Convert `ActualDuration` to units (e.g., 15-min increments).
+  * If rounding up would exceed auth or payer limits → show warning or block.
+* Display:
+
+  * Scheduled units vs actual units vs billable units.
+
+#### V-APP-03: Multi-Participant Time Consistency
+
+For multi-staff/multi-client:
+
+* If system uses **master appointment time**:
+
+  * Ensure all billable participants have times within that window.
+* If using **per-participant times**:
+
+  * Ensure:
+
+    * Staff durations align with payer rules.
+    * Client duration for billable portion is consistent with staff time (e.g., cannot bill for staff while client isn’t present, unless payer allows staff-only codes).
+
+Flag:
+
+* Staff times significantly longer than client presence.
+* Supervision times without overlapping RBT session when required.
+
+#### V-APP-04: Signature Presence
+
+Configurable per org/payer:
+
+* Require **staff signature** always for billable sessions.
+* Require **caregiver signature** for:
+
+  * In-home visits,
+  * EVV-required visits,
+  * Certain payers.
+* For each required signature:
+
+  * If missing:
+
+    * Block `Validated` status (still can be `Completed – Pending Validation`).
+  * If signature timestamp is too far from session end (e.g., >24h) → Warning.
+
+#### V-APP-05: Authorization Re-Check on Actual Time
+
+Authorization consumption must use **actual billable units**, not scheduled:
+
+* Recalculate units based on actual time.
+* Ensure auth still has remaining units.
+* If scheduled was fine but actual overshoots:
+
+  * Hard block vs soft warning based on clinic config.
+
+#### V-APP-06: EVV Completion
+
+For EVV-required appointments:
+
+* Required fields:
+
+  * Check-in time & location
+  * Check-out time & location
+  * Staff identity (EVV ID)
+  * Client identity
+  * Signature (if required by state/payer)
+* If any EVV element missing:
+
+  * Mark `EVV Status = Failed / Incomplete`.
+  * Appointment cannot be moved to `Validated` unless clinic allows override with exception reason.
+
+#### V-APP-07: Documentation Completion
+
+* If org requires documentation:
+
+  * Appointment cannot be `Validated` until note status = Complete.
+* If note exists but missing required fields (goals, behaviors, etc.) → warnings.
+
+---
+
+## 4. Multi-Staff & Multi-Client Handling in Completion View
+
+### 4.1 Example: BCBA + RBT + Single Client
+
+* Participants:
+
+  * Staff: RBT (Delivering Clinician), BCBA (Supervisor)
+  * Client: Child
+* Times:
+
+  * RBT: 3:00–5:00 PM
+  * BCBA: 3:30–4:30 PM (within that window)
+* Validations:
+
+  * Check RBT time against 97153 rules.
+  * Check BCBA time against 97155 rules.
+  * Ensure BCBA time overlaps with RBT time for supervision (if required).
+  * Ensure client is present for both times (unless payer allows otherwise).
+
+### 4.2 Example: Group Session – 3 Clients, 2 Staff
+
+* Appointment header:
+
+  * Service type = Group ABA (e.g., 97158 or payer-defined code).
+* Participants:
+
+  * 3 Clients (Group members)
+  * 2 Staff (one lead, one assistant)
+* Completion:
+
+  * System may need per-client and per-staff attendance & actual times.
+  * Some payers require:
+
+    * Each client’s billable units individually calculated.
+    * Group size may affect rate or code.
+* Validation:
+
+  * Group size within allowed min/max.
+  * All billed clients must have attended > minimum time threshold.
+  * Staff credentialing & ratios validated (e.g., 1:3, 2:4, etc. constraints).
+
+### 4.3 Example: Staff-Only Meeting
+
+* Appointment with only Staff participants.
+* No client = no clinical billing, unless:
+
+  * Code allowed for non-face-to-face service (e.g., case conference for some payers).
+* Completion validations:
+
+  * Only payroll rules.
+  * No authorization/payer mapping required (unless coded).
+  * Documentation optional (e.g., meeting notes).
+
+### 4.4 Example: Client-Only Event
+
+* Clinic wants to block “School exam day” on client calendar.
+* Participants: Client only.
+* Flags:
+
+  * `IsBillingRelevant = false`.
+* Completion:
+
+  * Optionally mark as “Occurred” or leave as informational; no signatures or EVV.
+
+---
+
+## 5. Exhaustive Appointment Type Taxonomy for ABA (Practical & Compliant)
+
+This is the “menu” your scheduler must support; each item has:
+
+* **Billable?** Y/N (varies by payer; system should allow config)
+* **Client Required?**
+* **Staff Required?**
+* **Typical Participant Pattern**
+
+I’ll keep it conceptual so you can map to actual CPT/H-codes per funding source.
+
+### 5.1 Core Clinical – Direct Care
+
+1. **Individual ABA Therapy (Direct)**
+
+   * Billable: Yes
+   * Client Required: Yes
+   * Staff Required: Yes (RBT/BCBA)
+   * Pattern: 1 Staff : 1 Client
+
+2. **Group ABA Therapy**
+
+   * Billable: Yes
+   * Client Required: Yes (2+ clients)
+   * Staff Required: ≥1
+   * Pattern: 1–2 Staff : 2–6 Clients (clinic-configurable)
+
+3. **Natural Environment Teaching / Community Session**
+
+   * Billable when coded as direct service.
+   * EVV often required (home/community).
+
+---
+
+### 5.2 Supervision & Treatment Planning
+
+4. **Supervision – With Client Present**
+
+   * BCBA supervises RBT while client present.
+   * Multiple staff & one client.
+
+5. **Supervision – Without Client Present**
+
+   * Some payers allow; some don’t.
+   * Staff-only appointment.
+
+6. **Treatment Planning / Case Conceptualization**
+
+   * Often billable under assessment or treatment-planning codes (payer specific) or non-billable.
+   * Staff-only; no client needed physically.
+
+---
+
+### 5.3 Parent / Caregiver Training
+
+7. **Parent/Caregiver Training – With Client Present**
+
+   * Participants: Staff + Caregiver + Client.
+
+8. **Parent/Caregiver Training – Without Client Present**
+
+   * Participants: Staff + Caregiver, no client.
+   * Payer-dependent; many allow if coded correctly.
+
+9. **School / IEP Meeting**
+
+   * Staff + School personnel ± Caregiver.
+   * Billable for some payers under specific codes; for others, non-billable.
+
+---
+
+### 5.4 Assessments
+
+10. **Initial Assessment – Direct with Client**
+11. **Re-assessment / Re-evaluation – Direct with Client**
+12. **Non-face-to-face Assessment Activities**
+
+    * Record review, scoring, report writing.
+    * Often billable as part of assessment code or separately, depending on payer.
+
+Participants:
+
+* Staff typically BCBA; may include client & caregiver for direct components.
+
+---
+
+### 5.5 Overlaps & Shadowing
+
+13. **Overlap Sessions** (RBT shadowing another RBT or BCBA)
+
+    * Multi-staff, one client.
+    * Billable or non-billable based on payer rules and org policy.
+
+14. **Transitions / Handoffs**
+
+    * Two staff present briefly at start/end of session.
+    * System supports overlapping time slices.
+
+---
+
+### 5.6 Non-Billable Clinical Support
+
+15. **Team Clinical Meetings**
+16. **Behavior Plan Review Meeting**
+17. **Internal Training on client-specific protocols**
+
+All staff-only, non-billable but payroll-relevant.
+
+---
+
+### 5.7 Administrative & Operational
+
+18. **PTO / Vacation** (Staff-only)
+19. **Sick Leave**
+20. **Travel Time** (may be billable or non-billable)
+21. **General Staff Training (non-client-specific)**
+22. **Admin Block / Office Work**
+
+No client; these should still appear on occupancies to guard staff availability.
+
+---
+
+### 5.8 Client-Centric Non-Billable Events
+
+23. **Client School Holidays/Exams**
+24. **Medical Appointments with Other Providers**
+25. **Caregiver-Only Homework Days / Practice Days**
+
+Client-only or client+caregiver events; purely calendar availability markers.
+
+---
+
+All these types:
+
+* Map into the same Appointment + Participants model.
+* Differ only by:
+
+  * Which participants are required.
+  * Which are billable.
+  * Which validations are enabled (auth, EVV, signatures).
+
+---
+
+## 6. Upgraded Persona Workflows (Delta Highlights)
+
+Rather than repeat everything, here’s how the new completion/signing layer slots into each persona:
+
+### Scheduler / Care Coordinator
+
+* Still owns creation, rescheduling, conflicts, auth checks.
+* **New responsibilities:**
+
+  * View appointments stuck in `Completed – Pending Validation`.
+  * Fix:
+
+    * Wrong staff or client attached.
+    * Auth mapping issues.
+    * Incorrect service type.
+  * Trigger re-validation.
+
+### BCBA / RBT
+
+* Now own **WF-APP-01**:
+
+  * Start/check-in, end/check-out.
+  * Ensure documentation is done.
+  * Capture necessary signatures.
+  * Trigger `Validate & Complete`.
+* For multi-staff:
+
+  * Each staff can:
+
+    * Confirm their own actual time.
+    * Sign individually.
+
+### Billing Admin
+
+* Works from **exceptions queue**:
+
+  * Appointments where sign-off failed validations.
+  * EVV failures.
+  * Missing signatures.
+  * Actual time vs scheduled anomalies.
+* Can return appointments to Scheduler/BCBA for correction.
+
+### Caregiver
+
+* Sees only:
+
+  * Their child’s appointments.
+* Can:
+
+  * Sign in same view (in portal or on mobile device in-session).
+  * Request corrections (e.g., “session ended earlier”) via messaging or flags.

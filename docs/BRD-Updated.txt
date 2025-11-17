@@ -1,0 +1,346 @@
+1. Context & Objectives
+1.1 Overview of the Scheduler
+The Scheduling module is a core part of an ABA practice management ecosystem that typically includes:
+Client & caregiver management
+Authorizations & insurance
+Clinical documentation (notes, programs, outcomes)
+Billing & claims
+Payroll & timesheets
+EVV (Electronic Visit Verification) for home/community visits
+Reporting & analytics
+For ABA, scheduling is not just calendar events; it drives revenue, compliance, and clinical continuity. ABA practices rely on high-frequency, long-term recurring sessions across multiple locations and modalities (center, home, school, telehealth).
+Key business outcomes for the Scheduler:
+Maximize schedule utilization & productivity (reduce idle therapist time and minimize gaps/overlaps).
+Reduce cancellations & no-shows via automation (reminders, easy reschedule flows, waitlist auto-fill).
+Ensure compliance with payor & regulatory rules (real-time authorization checks, EVV for Medicaid-funded in-home services, correct POS, eligible service codes).
+Support clinical continuity & outcomes (stable recurring schedules that match treatment plans, e.g., prescribed hours/week).
+Improve caregiver & staff experience (self-service portal, clear visibility, fewer surprises, predictable routines).
+1.2 Scope
+In-scope (for this Scheduler module):
+Appointment creation & management: single, recurring, and group sessions; center, home/community, school, and telehealth sessions; supervision and overlap sessions (BCBA + technician).
+Staff scheduling & availability management: working hours, locations, travel buffers, PTO/blackout time.
+Waitlist management: client waitlists by location, time window, staff, service type; manual and semi-automated suggestions.
+Multi-location & resource scheduling: rooms/areas, capacity constraints, staff working across sites.
+Basic telehealth integration from a scheduling perspective: handle time zones, generate/join links via integrated telehealth provider (stubbed).
+Authorization-aware scheduling: validation against remaining units/hours, dates, codes, POS.
+Notifications & reminders (functional specification): trigger rules and HIPAA-constrained content for SMS/email/app reminders.
+EVV-related scheduling hooks: mark sessions that require EVV; provide necessary EVV metadata (type, location, scheduled times).
+Role-based permissions for scheduling actions.
+Out-of-scope (now; to be considered for future phases):
+Full EVV capture workflows & integrations (start/stop, GPS, telephony).
+Advanced optimization / auto-scheduler (algorithmic matching for entire week/month at once).
+Complex payroll rules (e.g., overtime rate calculation, differential pay).
+Deep telehealth platform features (video, chat, whiteboarding).
+Custom patient engagement campaigns (beyond transactional reminders).
+Advanced capacity planning/forecasting (long-term utilization modelling).
+1.3 Assumptions
+Geography & payor environment:
+Primary geography: United States, with strong dependence on commercial insurance + Medicaid funding.
+EVV required for Medicaid-funded in-home services, in line with the 21st Century Cures Act mandates.
+Practice profile:
+Target: small and mid-sized ABA practices (e.g., 1–30 clinicians, 1–5 locations).
+Mix of center-based, home/community-based, school-based, and telehealth services.
+Deployment model:
+Cloud-based SaaS web application for back-office and clinical staff.
+Mobile app (iOS/Android) for technicians and BCBAs in the field (view schedule, basic adjustments).
+Caregiver portal/mobile app for schedule visibility and limited self-service.
+Integrations & modules (assumed available via same platform or APIs):
+Client master (demographics, contacts, status).
+Staff master (roles, credentials, locations, HR status).
+Authorizations/benefits (funders, service codes, units).
+Service catalog (CPT/HCPCS codes, modifiers, default durations).
+Billing & claims.
+Clinical documentation (session notes linked to appointments).
+EVV engine (internal or external).
+Notification engine (SMS/email/push).
+2. User Personas
+Each persona includes: role, goals, pain points, and how they interact with the Scheduler.
+2.1 Clinic Owner / Practice Admin
+Role: Business owner or executive managing financial health, growth, and compliance.
+Goals:
+High schedule utilization & revenue capture.
+Predictable cash flow; reduced denied claims due to scheduling/auth errors.
+Compliance (EVV, HIPAA, payor rules).
+Pain points:
+Underutilized staff; frequent cancellations/no-shows.
+Revenue leakage from incorrect scheduling against authorizations.
+Fragmented visibility across locations.
+Scheduler usage:
+High-level dashboards: utilization, cancellation/no-show rates, staff load.
+Configures global rules (no-show thresholds, overlapping policies, holidays).
+2.2 Scheduler / Front Office Admin
+Role: Primary owner of daily scheduling and communication with caregivers.
+Goals:
+Fill schedules efficiently, with minimal conflicts.
+Quickly respond to cancellations/reschedule requests.
+Pain points:
+Juggling staff/caregiver preferences, travel constraints, school hours, authorizations.
+Handling last-minute changes and waitlist manually.
+Scheduler usage:
+Create, edit, cancel appointments, manage recurring templates.
+Use waitlist and auto-suggest to fill open slots.
+Coordinate with staff & caregivers (notifications, confirmations).
+2.3 Clinical Director / BCBA Supervisor
+Role: Oversees clinical quality and resource allocation.
+Goals:
+Ensure treatment plans are delivered (hours/week per client).
+Ensure RBTs receive required supervision hours and BCBA overlaps.
+Pain points:
+Hard to ensure supervision requirements across large caseloads.
+Inefficient collaboration with schedulers on staff utilization.
+Scheduler usage:
+Review caseload coverage vs plan.
+Schedule / approve supervision and overlap sessions.
+Set staff capacity preferences, blocked supervision times.
+2.4 BCBA (Board Certified Behavior Analyst)
+Role: Clinical lead for assessment, planning and supervision.
+Goals:
+Manage own calendar (assessments, parent training, supervision, team meetings).
+Maintain required supervision hours over RBT caseload.
+Pain points:
+Double-booking with internal meetings vs client work.
+Unpredictable cancellations.
+Scheduler usage:
+View/modify schedule; propose openings.
+Approve/decline schedule requests.
+Book supervision overlap on top of existing technician session (within rules).
+2.5 RBT / Behavior Technician
+Role: Delivers direct therapy sessions.
+Goals:
+Clear, predictable schedule.
+Minimal travel between visits; realistic buffers.
+Pain points:
+Unrealistic scheduling with insufficient travel time.
+Last-minute changes not clearly communicated.
+Scheduler usage:
+Mobile calendar; route view for home visits.
+Confirm attendance, check-in/out (future EVV).
+Mark issues (client no-show, safety concerns).
+2.6 Insurance Coordinator / Authorization Specialist
+Role: Manages insurance approvals, authorizations, and renewals.
+Goals:
+Sessions scheduled only under valid authorizations.
+Monitor utilization (under/over) to trigger re-authorization.
+Pain points:
+Manual cross-checking of schedule against authorization balances.
+Scheduler usage:
+View authorization utilization by client.
+Configure which auths are linked to which services, staff, locations.
+Lock out or warn on sessions violating auth parameters.
+2.7 Billing Specialist
+Role: Converts completed sessions into clean claims.
+Goals:
+Accurate session data (codes, POS, units, modifiers).
+Fewer denials from mis-scheduled services.
+Pain points:
+Sessions scheduled at non-covered POS/time or with wrong staff type.
+Scheduler usage:
+View schedule vs billing queue.
+Identify sessions with validation warnings.
+Run reports on billable vs non-billable events.
+2.8 Caregiver / Parent / Guardian
+Role: Primary caregiver coordinating child’s schedule and attendance.
+Goals:
+Consistent sessions that fit family routine.
+Easy way to confirm, cancel, or reschedule.
+Pain points:
+Long waitlists, opaque scheduling, difficult to reschedule.
+Scheduler usage:
+Portal/app: view upcoming sessions, request changes, confirm attendance.
+Receive notifications & reminders (HIPAA-compliant content).
+2.9 School / District Contact
+Role: Coordinates ABA sessions for students receiving services at school.
+Goals:
+Sessions aligned to school timetable and IEP.
+Minimal conflict with exams, field trips, etc.
+Scheduler usage:
+View school-based schedule; block out blackout dates/events.
+Approve schedule blocks in advance.
+2.10 IT / System Admin
+Role: Manages system configuration, roles, and integrations.
+Goals:
+Proper permissions; secure integrations.
+Reliable availability and minimal user issues.
+Scheduler usage:
+Configure roles/permissions, global scheduler settings.
+Monitor integration failures and audit logs.
+2.11 Practice Profile Differences
+Single-location small practice: fewer staff; simpler resource constraints; scheduler often also front-desk.
+Multi-location SMB: cross-location staff sharing, room capacity and travel become critical.
+Center-based heavy: focus on room capacity, group sessions, block schedules.
+Home/community-based heavy: travel buffers, EVV, geographic clustering, route optimization are key.
+3. Core Scheduling Use Cases & Flows
+Each use case includes: description, preconditions, trigger, main flow, alternative flows, unhappy flows, and validations.
+3.1 Create a New Appointment
+Covers single, recurring, and group sessions across center, home, school, and telehealth; matches staff based on availability, skills, credentials, and payor requirements.
+Key preconditions: client active; staff active with required credential; at least one valid authorization (if insurance-funded).
+High-level happy path (single center-based individual session):
+Scheduler initiates 'New Appointment' from calendar or client/staff profile with date/time pre-selected.
+Select client; system loads client status and active funding/authorizations.
+Select service type (CPT/HCPCS + modifiers); system sets default duration and allowed staff roles.
+Select staff; system shows staff availability and potential conflicts.
+Confirm start/end time or duration; system computes units.
+System validates authorization (dates, units, payer rules).
+Select location type (center, home, school, telehealth); system sets POS and EVV flags where applicable.
+Optionally assign room and notes; system checks room capacity.
+Scheduler saves appointment; calendars update and notifications trigger per configuration.
+Alternative flows: recurring sessions (daily/weekly), group sessions, multiple staff, partial validation failures (warnings vs hard stops).
+3.2 Reschedule an Existing Appointment
+Allows changes to date/time and/or staff while preserving linkage to client, authorization, and documentation.
+Key steps:
+User opens existing appointment and chooses 'Reschedule'.
+User adjusts date/time; system shows conflicts, alternative time suggestions, and re-checks authorization.
+If needed, user switches staff; system enforces credential, location, and caseload rules.
+Updates appointment and sends notifications for rescheduled session.
+Variations: caregiver-initiated reschedule via portal (with policy-driven constraints); admin review when rules are violated.
+3.3 Cancel an Appointment
+Supports staff, caregiver, or clinic-driven cancellations with categories: timely cancel, late cancel, no-show.
+Key behavior:
+Capture cancellation reason and time relative to policy thresholds.
+Classify cancellation type (timely/late/no-show).
+Release slot to availability and optionally trigger waitlist suggestions.
+Send appropriate notifications to staff and caregivers.
+Mass cancellation for weather or holidays is supported as a bulk operation with consistent reason codes.
+3.4 Recurring Schedules
+Create long-term recurring schedules aligned to treatment plans (e.g., 20 hours/week for 6 months).
+Capabilities:
+Support daily, weekly, and bi-weekly patterns with specific days and end conditions.
+Estimate authorization consumption across all occurrences and warn when projected usage exceeds authorization.
+Handle holidays and blackouts by skipping, shifting, or flagging conflicting occurrences.
+Allow editing of recurrence (this occurrence / this and future occurrences).
+3.5 Waitlist Management
+Manage clients waiting for services and automatically suggest them into new openings.
+Key features:
+Add clients to waitlist with preferences (location, time window, staff, service type).
+Rank waitlisted clients by configurable criteria (e.g., date added, age, priority).
+When a slot opens, system suggests best-matching waitlist candidates; scheduler can convert suggestion into an appointment.
+3.6 Staff Scheduling & Availability
+Define working hours, preferred locations, blackout times (PTO, training, meetings), and travel buffers.
+Key behaviors:
+Staff or admins set recurring weekly availability and blackout blocks.
+System treats availability and blackouts as constraints on appointment creation.
+For home/community sessions, enforce minimum travel time between appointments with configurable buffers.
+3.7 Multi-location & Resource Scheduling
+Handle centers, rooms, and special resources (assessment tools, devices).
+Key behaviors:
+Each appointment includes a location and optional room/area.
+Rooms have capacities; system prevents overbooking beyond capacity or warns when nearing limits.
+Staff can have multiple default locations with allowable days/times per site.
+3.8 Client-Side Interactions
+Portal or app for caregivers to view and interact with schedules.
+Capabilities (MVP):
+View upcoming sessions in list and calendar formats.
+Request reschedule or cancellation subject to policy constraints.
+Receive reminders and notifications via configured channels (SMS/email/app).
+3.9 Supervision & Overlap Sessions
+Support BCBA supervision sessions overlapping with RBT sessions with correct billing and scheduling logic.
+Key behaviors:
+System allows overlapping sessions only when configured as supervision/overlap types.
+Supervision sessions are linked to underlying technician sessions for traceability and ratio calculations.
+Supervision time must be a subset of the main session duration.
+3.10 Telehealth Scheduling
+Schedule telehealth sessions while respecting eligibility rules and time zones.
+Key behaviors:
+Mark appointments as telehealth; auto-assign appropriate telehealth POS.
+Check telehealth eligibility per payer, service, and client.
+Integrate with telehealth provider for secure link creation and storage.
+Include secure join links in reminders while maintaining PHI-safe content.
+4. Validations, Business Rules & Constraints
+Rules are grouped into authorization-related, staff-related, client-related, scheduling consistency, and compliance/regulatory.
+4.1 Authorization-Related Rules
+Appointments must fall within authorization start/end dates.
+Estimated units/hours must not exceed remaining authorized units/hours.
+Service code + modifiers must be allowed by payer for that client.
+Place of service must be allowed for that service and payer.
+Daily/weekly limits on duration/frequency must be enforced where configured.
+Group vs individual constraints (allowed group size, allowed group codes).
+4.2 Staff-Related Rules
+Staff must be active (not terminated/suspended).
+Staff role/credentials must meet the minimum requirements for the service code.
+No overlapping sessions for the same staff unless explicitly allowed (e.g., supervision, group).
+Staff hours per day/week must not exceed configured thresholds (fatigue/compliance).
+Staff must be assigned or allowed at the selected location.
+4.3 Client-Related Rules
+Client must be active (not discharged or on hold).
+Client must be eligible for the selected service based on treatment plan and funding.
+Client must be on the selected staff member’s care team or allowed exceptions must be respected.
+Geographical feasibility for in-home sessions (adequate travel time between appointments).
+4.4 Scheduling Consistency Rules
+No overlapping appointments for the same client except allowed exceptions (e.g., supervision).
+Appointments must fall within configured clinic hours for the location.
+No appointments on clinic holidays or blackout days unless override is used.
+Time zone consistency: store in UTC and display in user’s local time.
+4.5 Compliance / Regulatory Rules
+HIPAA: reminders and communications must be PHI-safe (limited details).
+EVV: home/community visits that require EVV must be flagged and include necessary EVV data fields.
+Telehealth: enforce consent capture and payor-specific limitations.
+Audit trail: all appointment changes must be logged with user, timestamp, and before/after values.
+5. Integrations, Upstream & Downstream Dependencies
+5.1 Upstream Dependencies (Inputs to Scheduler)
+Client Master: demographics, status, contacts, funding sources.
+Authorization/Insurance: authorizations with codes, units, dates, payer rules.
+Staff Master/HR: staff status, roles, credentials, locations, and pay details.
+Service Catalog: codes, default durations, allowed POS, modifiers.
+Location/Room Registry: sites, rooms, capacity, hours, holidays.
+Treatment Plan: target hours per week, required services, supervision requirements.
+5.2 Downstream Dependencies (Outputs from Scheduler)
+Billing & Claims: export of completed sessions with codes, units, POS, modifiers, and statuses.
+Payroll & Timesheets: staff hours (scheduled and actual), location, and travel time when available.
+Clinical Documentation: session shells for progress notes linked to appointments.
+EVV Systems: EVV-required session metadata for check-in/check-out workflows.
+Reporting & Analytics: schedule and utilization data for dashboards and reports.
+Notification Engine: reminder and change event payloads with template parameters.
+6. Edge Cases, Unhappy Paths & Real-Life Scenarios
+Double-booking attempts for staff or rooms.
+Appointments scheduled beyond authorization end date or remaining hours.
+Staff calling out sick on the same day (bulk reassign or cancel workflow).
+Weather or force majeure closures requiring mass cancellation/rescheduling.
+Client repeated no-shows and policy-driven escalation.
+Parent/caregiver changing recurring schedule mid-authorization.
+Partial attendance with different actual vs scheduled times.
+Telehealth link failures or mid-session disruptions requiring rescheduling.
+Multiple funding sources (insurance + private pay) affecting coverage vs non-covered portions.
+7. Configuration & Admin Settings
+Clinic hours, holidays, and blackout dates per location.
+Default session lengths per service code.
+Rules for overlapping sessions for staff and clients.
+Thresholds and classification for no-shows and late cancellations.
+Notification rules (channels, timing, templates, quiet hours).
+Waitlist behavior and prioritization logic.
+Authorization blocking vs warning behaviors per payer or service.
+Travel buffer rules for in-home/community sessions.
+Role-based permissions defining who can override validations and perform bulk actions.
+8. Non-Functional Requirements
+Performance: calendar views load within ~2 seconds; validations within ~500–1000 ms for typical SMB volumes.
+Scalability: support growth to 100+ staff and tens of thousands of appointments per month.
+Security & Privacy: HIPAA-aligned encryption, access control, and secure integrations.
+Auditability: detailed audit logs of all scheduling actions and changes.
+Availability: scheduler uptime target of at least 99.5% during business hours with graceful degradation if dependencies fail.
+Usability: optimized workflows for non-technical front office staff with clear error messages and visual indicators.
+9. Open Questions / Assumptions to Validate
+State-specific EVV rules and how strictly they must be enforced by the scheduler.
+Clinic-specific cancellation and fee policies (system-enforced vs policy-only).
+Degree of caregiver self-service (direct booking vs request-only).
+Range and complexity of payors and plans to support (standard rules vs custom rule engine).
+Telehealth vendor strategy (single vendor vs bring-your-own, required certifications and BAAs).
+Depth of route/travel optimization required in near term vs future phases.
+Specific supervision rules and ratios (clinic- vs funder-driven).
+10. MVP vs Future Enhancements
+MVP Scope:
+Single and recurring individual sessions across all service locations (center, home, school, telehealth).
+Basic staff availability and blackout management.
+Room and capacity scheduling.
+Basic waitlist with manual and semi-automated suggestions.
+Authorization validations (dates, units, allowed codes/POS) with configurable blocking vs warnings.
+No-show and late cancellation tracking with simple reporting.
+Supervision/overlap scheduling (BCBA over RBT) with linkage and time constraints.
+Telehealth scheduling via a single integrated provider with secure links.
+EVV marking for in-home Medicaid services (metadata only).
+Caregiver portal for viewing schedules and submitting change requests.
+Staff mobile app with schedule view and basic status updates.
+Future Enhancements:
+Advanced auto-scheduling and optimization (routing, clustering, auto-fill open slots).
+Full EVV application with GPS, telephony, and offline capture.
+Advanced analytics and forecasting for capacity planning and growth scenarios.
+Complex multi-payer splitting and real-time private-pay handling per session.
+Deeper telehealth features and multiple vendor support.

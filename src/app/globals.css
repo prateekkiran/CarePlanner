@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply min-h-screen bg-gradient-to-br from-[#f7f9ff] via-[#fdf2ff] to-[#f1fbff] text-slate-700 antialiased;
+  }
+}
+
+@layer utilities {
+  .workspace-grid {
+    @apply grid gap-6;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  }
+
+  .workspace-primary,
+  .workspace-secondary {
+    @apply flex flex-col gap-6;
+  }
+}
