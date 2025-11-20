@@ -1,0 +1,898 @@
+1. Purpose, Scope & Personas
+1.1 Purpose of the Schedule Page
+The Schedule page is the 
+control tower
+ for all ABA sessions:
+Shows sessions across 
+staff
+, 
+clients
+, 
+rooms
+, and 
+locations
+.
+Allows fast 
+create / edit / reschedule / cancel
+ flows.
+Enforces ABA-specific rules (authorizations, travel, EVV, supervision).
+Surfaces 
+gaps, risks, and opportunities
+ (underutilized staff, make-up hours, waitlist matches).
+1.2 In-scope for this page
+Visualizing sessions by 
+time
+ and 
+resource
+ (staff, room).
+Filters for:
+Date range (day / 3-day / week).
+Location, care setting, staff, clients, rooms.
+Flags (EVV required, auth at risk, waitlist matches, etc.).
+Quick scheduling flows:
+From empty slots.
+From highlights/waitlist.
+From staff or client context.
+Editing flows:
+Drag/drop reschedule.
+Resize duration.
+Change staff/room/location.
+Cancel/no-show/convert to telehealth.
+EVV / auth / travel conflict indicators.
+Out-of-scope (but referenced):
+Managing authorizations themselves (separate Auth module).
+Clinical documentation (notes UI).
+Payroll and billing reports.
+Full analytics views (you already specced those separately).
+1.3 Personas on the Schedule Page
+1. Scheduler / Front Office Admin (Primary)
+Needs to fill calendars, avoid conflicts, respond to changes fast.
+Uses:
+Multi-staff week view.
+Highlights (make-up hours, waitlist).
+Drag/drop reschedule.
+2. Clinical Director / BCBA Supervisor
+Needs visibility into:
+Supervision sessions.
+Tech schedules.
+Over/under-utilization.
+Uses:
+Staff lanes for their team.
+Filters by role/location.
+“My schedule” view as BCBA.
+3. BCBA / RBT (Field Staff)
+Needs simple:
+“My week” view.
+Ability to see where to go / when.
+Basic reschedule requests (if allowed).
+Likely uses “My schedule” (read-heavy, light edit).
+4. Clinic Owner / Practice Admin
+Wants high-level view:
+Are we busy?
+Any obvious gaps today?
+Uses:
+Day or week view with all locations.
+Quick drill into specific staff/rooms.
+5. Billing / Authorization Specialist
+Needs to spot:
+Sessions outside auth ranges.
+Double-scheduled codes.
+Uses:
+Flags like “Auth at risk”.
+Filters by payer.
+6. IT / System Admin
+Uses page mostly for:
+Role/permission validation.
+Testing filters and performance.
+2. Page Anatomy & Layout (Visual Guide)
+Think 
+3-column mental model
+:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Top Header: scope, date range, view mode, primary actions                   │
+├───────────────┬───────────────────────────────────────────────┬─────────────┤
+│ Left Rail     │ Main Timeline Canvas                          │ Right Drawer│
+│ (filters,     │ (staff/room lanes, sessions, empty slots)     │ (details /  │
+│ saved views,  │                                               │ create/edit)│
+│ highlights)   │                                               │             │
+└───────────────┴───────────────────────────────────────────────┴─────────────┘
+2.1 Top Header (
+ScheduleHeader
+)
+Position:
+ Stickied at top.
+Content:
+Left:
+Page title: 
+Schedule
+Scope selector:
+Scheduler view | My schedule | Client schedule
+ (shadcn 
+ToggleGroup
+ or 
+Tabs
+).
+Center:
+Date navigator:
+<
+ 
+Week of Nov 17–23, 2025
+ 
+>
+View mode: 
+[ Day | 3-day | Week ]
+Today
+ button.
+Right:
+Location
+ dropdown (for multi-site).
+Primary action: 
++ New session
+.
+Behavior:
+Changing scope or view mode updates main canvas.
+Date navigation affects timeline range.
++ New session
+ opens right drawer in 
+full create mode
+ (no preselected slot).
+2.2 Filter Bar (
+ScheduleFiltersBar
+)
+Position:
+ Below header, full width.
+Content:
+Care setting filters (chips):
+[ Center ] [ Home ] [ School ] [ Telehealth ]
+Flags:
+[ Show EVV required ] [ Auth at risk ] [ Waitlist ready ] [ Show my staff ]
+“Advanced filters” button:
+Opens popover/drawer with:
+Staff roles (RBT, BCBA, etc.).
+Client age band.
+Payer.
+Session status.
+Room type.
+Libraries:
+Use shadcn 
+Badge
+ / 
+Toggle
+ / 
+Popover
+ components for chips and advanced filters. (
+builder.io
+)
+2.3 Left Rail (
+SchedulerLeftRail
+)
+Sections:
+Search
+Command
+-style search (shadcn 
+Command
+ / 
+Dialog
+):
+Search by client, staff, session ID.
+Keyboard shortcut: 
+Cmd/Ctrl + K
+.
+Scope Filters
+Staff selector:
+Multi-select with avatars and utilization chips.
+Client selector:
+When in “Client schedule” mode, picks focal client(s).
+Room selector:
+Used mostly in “Room timeline” view.
+Saved Views
+List of presets:
+Default scheduler view
+Center A – RBTs only
+Telehealth Wednesday
+Each view stores filter states (location, care setting, staff subset, overlays).
+Highlights (Insights)
+List of interactive “insight cards”:
+3 clients need make-up hours this week [View]
+Telehealth booths 80% utilized today [View]
+Waitlist: 2 matches for Wed afternoon [View]
+Clicking each:
+Adjusts filters.
+Opens right drawer with further details.
+2.4 Main Timeline Canvas (
+TimelineCanvas
+)
+Default in Scheduler view:
+Lanes
+ = Staff (RBTs + BCBAs).
+Horizontal axis
+ = Time (for chosen day / 3-day / week).
+Lane header content (per staff):
+Name + avatar.
+Role chip (
+RBT
+, 
+BCBA
+).
+Location chip (
+Center A
+).
+Utilization chip (
+28/35 hrs this week
+).
+Status indicator (e.g., 
+On leave today
+).
+Timeline content:
+Background showing 
+availability
+ (faint green for available hours, grey for off-hours).
+Session cards
+:
+Rounded cards with:
+Client name.
+Service code (e.g., 
+97153
+).
+Care setting icon (
+🏥
+, 
+🏠
+, 
+🏫
+, 
+💻
+).
+Auth status pill: 
+OK
+, 
+Low
+, 
+At risk
+.
+Status chip: 
+Scheduled
+, 
+Completed
+, 
+Cancelled
+.
+Color-coded by 
+session type
+ or 
+status
+.
+Empty space behavior:
+Clicking or dragging on empty space in a lane initiates 
+quick-create
+.
+Clicking on empty background (not lane) initiates 
+generic create
+ (date/time prefilled, staff unselected).
+Libraries:
+For timeline behavior (lanes + drag/drop + resize), use/extend:
+react-calendar-timeline
+ (timeline lanes w/ events). (
+npm
+)
+Or a fully featured scheduler like Syncfusion or DHTMLX for React if you want multi-view + drag/drop out of the box. (
+Syncfusion
+)
+2.5 Right Drawer (
+SessionDrawer
+)
+Usage:
+Session details view (read/edit).
+Session create / quick-create context.
+Waitlist/insights detail.
+Sections in Session mode:
+Header:
+Session title: 
+Direct ABA – Aarav & Jordan
+Date/time + care setting.
+Status chip (
+Scheduled
+ / 
+Completed
+ / 
+Cancelled
+ / 
+Pending note
+).
+Details:
+Service code & description.
+Duration.
+Location & room.
+EVV requirement & status.
+Participants:
+Client (clickable).
+Staff (lead tech).
+BCBA supervisor (if any).
+Authorization:
+Payer, service code.
+Approved vs used vs remaining units.
+Auth dates & risk level.
+Actions:
+Primary: 
+Edit session
+ / 
+Save
+.
+Secondary: 
+Reschedule
+.
+Tertiary: 
+Cancel session
+, 
+Mark no-show
+, 
+Duplicate
+, 
+Convert to recurring
+.
+3. Core Flows (Happy Paths & Edge Cases)
+I’ll map flows as tables: 
+Step | Actor | UI behavior | System behavior | Validations
+.
+3.1 View & Navigate Schedule
+3.1.1 Change week, view modes
+Step
+Actor
+UI behavior
+System behavior
+Validations
+1
+Scheduler
+Clicks 
+<
+ or 
+>
+ in date navigator
+Updates date range in header; adjusts timeline viewport
+N/A
+2
+Scheduler
+Toggles 
+Day / 3-day / Week
+Re-renders timeline granularity
+N/A
+3
+Scheduler
+Changes 
+Location
+ dropdown
+Filters staff/rooms to that location; updates sessions list
+N/A
+3.2 Create Session from Staff Lane (Quick-create)
+Scenario:
+ Scheduler fills Jordan’s open slot on Wednesday 3–5 PM.
+Step
+Actor
+UI behavior
+System behavior
+Validations
+1
+Scheduler
+Click-drag on Jordan’s lane from 3 to 5 PM on Wed
+Shows ghost session pill 
+New session · 3:00–5:00 PM
+N/A
+2
+System
+Opens right drawer in “Create session” mode with staff + date/time prefilled
+Prefills: staff=Jordan, date=Wed, start=15:00, end=17:00, default service from staff role
+Validate: staff is active and available in that time block
+3
+Scheduler
+Selects service type from dropdown (e.g., 
+97153 – Direct ABA
+)
+Fetches allowed care settings and required EVV and resources for that code
+Check: staff credentials allow selected service; else show inline error
+4
+Scheduler
+Selects care setting (
+Home
+)
+Drawer shows address and EVV requirement preview
+Check: client (once chosen) must support this setting (e.g., home allowed, EVV needed for Medicaid home services)
+5
+Scheduler
+Clicks “Select client” and sees list of recommended clients (make-up hours, auth OK, preferences match)
+System ranks clients by: unmet plan hours this week, auth status, preference match, travel feasibility
+Ensure ranking uses only clients with active status and correct funding
+6
+Scheduler
+Chooses 
+Aarav Sharma
+ from list
+Drawer shows auth summary and plan coverage
+Validate: existing auth for code/setting and date; show remaining units
+7
+System
+Runs validation checks and shows results (availability, overlaps, auth, travel, EVV) with icons (
+✅
+/
+⚠
+/
+❌
+) inline
+Checks: staff schedule, client schedule, room availability (if center), authorization, EVV requirement
+If hard violations, disable “Create” and show error; for soft issues, show warning but allow override if allowed
+8
+Scheduler
+Clicks 
+Create session
+Creates 
+appointment
+ record + 
+appointment_staff
+, 
+appointment_client
+, 
+appointment_room
+ etc.
+Final server-side validation before commit
+9
+System
+Ghost pill becomes solid session card; right drawer optionally closes or stays in “create another” mode (configurable user pref).
+Updates timeline; updates utilization and coverage metrics; triggers notifications if configured
+N/A
+Edge cases & unhappy flows:
+Auth not found or expired
+Show error:
+“No active authorization for 97153 – Home on this date. Contact auth team or adjust service/location.”
+Disable create unless user has an override permission.
+Staff conflict
+ (overlapping session)
+Red border on ghost card; inline message:
+“Jordan already scheduled 3:00–4:00 with Mia. Choose another time or staff.”
+Provide quick link: “See Jordan’s full schedule this day”.
+Client conflict
+Similar treatment: show overlapping session.
+Travel buffer insufficient
+ (home visits)
+Warning, not hard error:
+“Only 10 min travel between this and prior home visit; required buffer is 20 min.”
+3.3 Create Session from Empty Background (Choose Staff Later)
+Scenario:
+ Scheduler knows time window first, staff later.
+Step
+Actor
+UI behavior
+System behavior
+Validations
+1
+Scheduler
+Clicks on Wed 10–11 AM on empty background (not a lane)
+Shows context menu: 
+New session · Wed 10–11 AM
+N/A
+2
+System
+Opens right drawer “New session – pick staff”
+Prefills date/time; staff field empty
+N/A
+3
+Scheduler
+Clicks staff field
+Sees ranked list of staff available in that window
+Filters staff: active, available, correct location & role
+4
+Scheduler
+Picks staff (e.g., 
+Sam – RBT – Underbooked (60% this week)
+)
+Creates ghost session pill on Sam’s lane at 10–11 AM
+Run availability check again to avoid race conditions
+5
+Scheduler
+Continues choosing service, client, etc., as in 3.2
+Same validations and flows
+Same as create from lane
+3.4 View / Edit Existing Session
+Step
+Actor
+UI behavior
+System behavior
+Validations
+1
+Scheduler
+Clicks an existing session card
+Highlights card and opens right drawer in “Session details” mode
+N/A
+2
+System
+Shows: summary, participants, auth, EVV, lifecycle status, audit trail
+Fetches from backend; may lazily load history
+N/A
+3
+Scheduler
+Clicks 
+Edit session
+Switches drawer to editable form; maintains context
+N/A
+4
+Scheduler
+Adjusts time or care setting or staff in form (without drag)
+System recomputes validations, shows results inline
+Same validations as create
+5
+Scheduler
+Clicks 
+Save
+Updates appointment + related tables
+Re-run server-side validations, log audit entry
+3.5 Drag & Drop Reschedule
+Same-staff reschedule:
+Step
+Actor
+UI behavior
+System behavior
+Validations
+1
+Scheduler
+Drags session card horizontally on same staff lane to new time
+Card moves with ghost preview; conflicts indicated by color
+Live check: staff/client/room availability, auth validity at new time
+2
+System
+Shows tooltip during drag: 
+New time: Wed 2–4 PM · Auth OK
+ or warnings
+Updates conflict state every few hundred ms
+If dropping in invalid region, show “cannot drop here” animation
+3
+Scheduler
+Releases mouse (drops)
+If valid: commit change; if not: snap back and show message
+If conflict exists, show modal: “Cannot move here due to [reason]. Try another slot.”
+Cross-staff reassignment:
+Step
+Actor
+UI behavior
+System behavior
+Validations
+1
+Scheduler
+Drags card vertically from Jordan lane to Sam lane
+Other lanes dim if staff invalid; valid lanes remain normal
+Check: new staff credentials, role, location, availability, relationship to client
+2
+System
+Shows tooltip: 
+Reassign to Sam? Sam utilization: 55% this week
+Precomputes Sam’s utilization and roles
+If staff cannot serve client or service, lane appears disabled
+3
+Scheduler
+Drops on Sam lane at same time
+Shows confirmation dialog: “Reassign session from Jordan to Sam?”
+On confirm, update 
+appointment_staff
+ while preserving 
+appointment
+ record
+4
+System
+Updates schedule, notifies relevant parties (if configured)
+Writes audit log: who re-assigned, from whom, when
+Full validation as per create, including caseload thresholds
+3.6 Resize to Change Duration
+Step
+Actor
+UI behavior
+System behavior
+Validations
+1
+Scheduler
+Grabs right edge of session card and drags 
+to extend from 2 to 2.5 hours
+Card visually stretches; label 
+updates: 
+New duration: 2.5h
+Check overlapping sessions, room capacity, staff availability
+2
+System
+Shows auth summary badge updating live: 
+Remaining after: 1.6 hrs
+Recalculates remaining auth units for that client/service
+If new length exceeds remaining auth beyond tolerance, show red status and require override
+3
+Scheduler
+Releases mouse
+If allowed, update appointment duration
+Re-run validations; if over constraints, show dialog and revert or allow override by permission
+3.7 Cancel / No-Show Flow
+Step
+Actor
+UI behavior
+System behavior
+Validations
+1
+Scheduler
+Clicks session → 
+Cancel session
+ or 
+Mark no-show
+Opens modal with reason selection and policy hints
+Check cancellation window vs clinic policy
+2
+Scheduler
+Selects reason (e.g., 
+Client sick
+, 
+Staff sick
+, 
+Weather
+), chooses type (
+Timely / Late / No-show
+)
+System computes classification based on time before start
+If late cancel/no-show should incur fee, show that
+3
+Scheduler
+Confirms action
+Updates appointment status; optionally creates billing flag / no-show charge; frees slot
+Ensure cascade rules: don’t delete appointment, just change status
+4
+System
+Removes active card from timeline or greys it out depending on filter; may suggest using slot for waitlist clients
+Triggers notifications; logs cancellation for analytics
+N/A
+4. Validations & Rules (Specific to Schedule Page)
+You already defined global rules; here’s how they manifest on this page.
+4.1 When Creating / Editing Sessions
+Staff validations:
+Active & not terminated.
+Credentials support service code.
+Availability block includes this time.
+No overlapping sessions unless:
+Group session or supervision overlap is explicitly allowed.
+Daily/weekly max hours thresholds (soft or hard depending on config).
+Client validations:
+Active, not on hold/discharged (or only allow future-dated sessions beyond hold).
+Care setting allowed (home/center/school/telehealth).
+No overlapping client sessions except defined exceptions (supervision overlaps).
+Authorization validations:
+Active auth for payer+service code+place-of-service.
+Date within auth start/end.
+Session duration doesn’t exceed remaining units beyond configured tolerance.
+Frequency limits (e.g., no more than X hours per week if payor-defined).
+Room & resource validations (for center sessions):
+Room exists & active for location.
+Room capacity >= number of clients in session.
+No overlapping bookings beyond 
+max_concurrent_sessions
+.
+Required resources (e.g., telehealth license pool) have available capacity.
+Travel & geography validations (home/community):
+Travel time between consecutive home visits for staff meets minimum buffer.
+Client’s region is within staff’s allowed travel zones.
+EVV:
+For EVV-required sessions, care setting and payer combination must support EVV.
+For schedule view, you primarily enforce that EVV flag is correctly set; actual check-in/out is handled at visit time.
+4.2 When Dragging / Resizing
+Soft vs hard validations:
+Hard:
+Auth invalid for new time/location.
+Staff/room/client double-booking not allowed.
+Soft:
+Bumping into daily max hours.
+Travel buffer issues.
+Scheduling outside client preferred window.
+Error messaging guidelines:
+Clear, specific, contextual:
+“Cannot move to 3–5 PM: Jordan is already scheduled with Mia from 3–4 PM.”
+“This slot is outside Aarav’s allowed time window (8–18). Requires override.”
+“Extends beyond remaining auth units. Ask billing or shorten session.”
+5. Component Breakdown (Implementation-oriented)
+I’ll give you a React-ish breakdown with primary props/concerns.
+5.1 
+SchedulePage
+Responsibilities:
+Top-level container.
+Orchestrates data fetching (sessions, staff, clients, rooms).
+Holds global filter state.
+Key props/state:
+viewScope: 'scheduler' | 'my' | 'client'
+viewMode: 'day' | '3day' | 'week'
+selectedDateRange
+filters: { locationIds, careSettings, flags, roles, payers, ... }
+Derived:
+visibleStaff
+, 
+visibleRooms
+, 
+visibleSessions
+.
+5.2 
+ScheduleHeader
+Props:
+viewScope
+, 
+onViewScopeChange
+viewMode
+, 
+onViewModeChange
+selectedDateRange
+, 
+onChangeDateRange
+onNewSessionClick
+locations
+, 
+selectedLocation
+, 
+onLocationChange
+5.3 
+ScheduleFiltersBar
+Props:
+careSettings
+, 
+selectedCareSettings
+, 
+onCareSettingsChange
+flags
+, 
+selectedFlags
+, 
+onFlagsChange
+onOpenAdvancedFilters
+Implementation:
+Use shadcn 
+ToggleGroup
+ and 
+Badge
+/
+Button
+ components for chips.
+5.4 
+SchedulerLeftRail
+Props:
+onSearch
+staffOptions
+, 
+selectedStaffIds
+, 
+onStaffChange
+clientOptions
+, 
+selectedClientIds
+, 
+onClientChange
+roomOptions
+, 
+selectedRoomIds
+, 
+onRoomChange
+savedViews
+, 
+onSavedViewSelect
+highlights
+, 
+onHighlightClick
+5.5 
+TimelineCanvas
+Props:
+mode: 'staff' | 'room' | 'client'
+lanes: Lane[]
+ where 
+Lane = { id, label, subLabel?, utilization?, role?, avatarUrl? }
+sessions: Session[]
+ where Session has id, laneId, start, end, meta (client, staff, room, etc.)
+availabilityBlocks
+Callbacks:
+onEmptySlotClick({ laneId?, dateTimeRange })
+onSessionClick(sessionId)
+onSessionDrag({ sessionId, newLaneId, newRange })
+onSessionResize({ sessionId, newRange })
+5.6 
+StaffLane
+ / 
+RoomLane
+Child components inside 
+TimelineCanvas
+:
+Render header + sessions + empty areas.
+Responsible for positioning sessions in time.
+5.7 
+SessionCard
+Props:
+session
+onClick
+onDragStart
+, 
+onDragEnd
+, 
+onResizeStart
+, 
+onResizeEnd
+Flags:
+hasAuthRisk
+, 
+hasTravelRisk
+, 
+requiresEVV
+, 
+isCancelled
+, 
+isNoShow
+Visual:
+Rounded card with:
+[Client name]
+[Code · Duration]   [Setting icon]   [Auth pill]
+[Status pill]
+5.8 
+SessionDrawer
+Modes:
+view
+ vs 
+edit
+ vs 
+create
+.
+Props:
+mode
+session?
+prefillContext?
+ (staffId, dateTimeRange, clientId, setting)
+Event handlers:
+onSave(sessionDraft)
+onCancelSession
+onRescheduleRequest
+onClose
+5.9 
+QuickCreatePopover
+ (optional micro-component)
+Appears inline at clicked slot before opening drawer:
+Minimal UI: “Create new session here?” with snippet of time & staff.
+6. Visual / Design Guidance
+Use a 
+clean, neutral base
+ (light greys) for background, with color used sparingly for:
+Session types.
+Status.
+Flags (auth risk, EVV).
+Roundness:
+Cards with 
+rounded-xl
+.
+Soft shadow (
+shadow-sm
+), not heavy.
+Typography:
+Clear hierarchy: e.g., 
+text-sm
+ for meta, 
+text-xs
+ for pills, 
+font-medium
+ for names.
+Motion:
+Smooth but subtle transitions on:
+Session drag.
+Drawer open/close.
+Filter toggles.
+Accessibility:
+Contrast-compliant colors.
+Keyboard navigation for session focus and actions.
+Screen reader labels for session details.
+If you use a library like Syncfusion Scheduler or DHTMLX Scheduler, you’ll get drag/drop, resizing, and multiple views bundled; your work becomes mostly 
+styling + configuring ABA-specific validations
+ and integrating with your backend. (
+Syncfusion
+)
+7. Non-functional Requirements for the Schedule Page
+Performance:
+Virtualized lanes (e.g., more than 30 staff).
+Lazy-loading sessions by date range.
+Concurrency:
+Handle concurrent edits gracefully:
+Re-validate on save.
+Show soft info: “This session was updated by X 2 minutes ago.”
+Auditability:
+Every change via schedule page logs actor, timestamp, old/new values.
+Responsiveness:
+Desktop-first for scheduler, but degrade to:
+“Agenda” view on small widths.
+Single-lane view for “My schedule” on mobile.
