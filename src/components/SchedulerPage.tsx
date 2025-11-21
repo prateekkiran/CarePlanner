@@ -92,10 +92,15 @@ type SchedulePrefill = {
   durationMinutes?: number;
 };
 
-export function SchedulerPage() {
+type SchedulerPageProps = {
+  weekAnchor?: Date;
+  onWeekAnchorChange?: (next: Date, horizonDays: number) => void;
+};
+
+export function SchedulerPage({ weekAnchor: controlledWeekAnchor, onWeekAnchorChange }: SchedulerPageProps) {
   const [scope, setScope] = useState<(typeof VIEW_SCOPES)[number]>('Scheduler view');
   const [viewMode, setViewMode] = useState<(typeof VIEW_MODES)[number]>('Week');
-  const [weekAnchor, setWeekAnchor] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [internalWeekAnchor, setInternalWeekAnchor] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [location, setLocation] = useState('All campuses');
   const [careFilters, setCareFilters] = useState<Array<'Center' | 'Home' | 'School' | 'Telehealth'>>(CARE_SETTINGS);
   const [flags, setFlags] = useState<string[]>([]);
@@ -151,6 +156,7 @@ export function SchedulerPage() {
     return map;
   }, []);
   const authorizations = schedulerSnapshot.authorizations;
+  const anchor = controlledWeekAnchor ?? internalWeekAnchor;
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -176,18 +182,37 @@ export function SchedulerPage() {
 
   const visibleSessions = useMemo(() => {
     return sessions.filter((session) => {
-      const inRange = session.start >= weekAnchor && session.start < addDays(weekAnchor, horizonDays);
+      const inRange = session.start >= anchor && session.start < addDays(anchor, horizonDays);
       const careMatch = careFilters.includes(session.modality);
       const staffMatch = selectedStaff.length === 0 ? false : session.laneId ? selectedStaff.includes(session.laneId) : false;
       const clientMatch = selectedClients.length === 0 ? true : session.clientId ? selectedClients.includes(session.clientId) : false;
       return inRange && careMatch && staffMatch && clientMatch;
     });
-  }, [sessions, weekAnchor, horizonDays, careFilters, selectedStaff, selectedClients]);
+  }, [sessions, anchor, horizonDays, careFilters, selectedStaff, selectedClients]);
 
   const selectedSession = visibleSessions.find((session) => session.id === selectedSessionId);
 
+  useEffect(() => {
+    // keep parent informed when view scale changes
+    onWeekAnchorChange?.(anchor, horizonDays);
+  }, [horizonDays, anchor, onWeekAnchorChange]);
+
+  useEffect(() => {
+    if (!controlledWeekAnchor) {
+      onWeekAnchorChange?.(anchor, horizonDays);
+    }
+  }, [anchor, horizonDays, controlledWeekAnchor, onWeekAnchorChange]);
+
+  function updateWeekAnchor(next: Date) {
+    if (controlledWeekAnchor) {
+      onWeekAnchorChange?.(next, horizonDays);
+    } else {
+      setInternalWeekAnchor(next);
+    }
+  }
+
   function handleWeekChange(delta: number) {
-    setWeekAnchor((prev) => addDays(prev, delta * horizonDays));
+    updateWeekAnchor(addDays(anchor, delta * horizonDays));
   }
 
   function toggleCare(setting: (typeof CARE_SETTINGS)[number]) {
@@ -299,7 +324,7 @@ export function SchedulerPage() {
       const minutesFromStart = (clampedX / laneWidth) * totalRange;
       const dayIndex = Math.min(horizonDays - 1, Math.max(0, Math.floor(minutesFromStart / minutesPerDay)));
       const minuteWithinDay = minutesFromStart - dayIndex * minutesPerDay;
-      const newStartBase = addDays(weekAnchor, dayIndex);
+      const newStartBase = addDays(anchor, dayIndex);
       const newStart = new Date(newStartBase);
       newStart.setHours(HOURS[0], 0, 0, 0);
       const roundedMinutes = Math.round(minuteWithinDay / 5) * 5;
@@ -313,7 +338,7 @@ export function SchedulerPage() {
         return next;
       });
     },
-    [horizonDays, weekAnchor]
+    [anchor, horizonDays]
   );
 
   return (
@@ -362,7 +387,7 @@ export function SchedulerPage() {
               <ArrowBackIosNew fontSize="inherit" />
             </IconButton>
             <Chip
-              label={`Week of ${format(weekAnchor, 'MMM d, yyyy')}`}
+              label={`Week of ${format(anchor, 'MMM d, yyyy')}`}
               color="secondary"
               variant="outlined"
               sx={{ borderRadius: '999px', px: 2, fontWeight: 600, letterSpacing: 0.5 }}
@@ -487,7 +512,7 @@ export function SchedulerPage() {
           <TimelineCanvas
             lanes={filteredLanes}
             sessions={visibleSessions}
-            weekAnchor={weekAnchor}
+          weekAnchor={anchor}
             horizonDays={horizonDays}
             selectedSessionId={selectedSessionId}
             onSelectSession={setSelectedSessionId}
